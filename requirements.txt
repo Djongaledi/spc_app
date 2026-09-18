@@ -4,3 +4,4 @@ qrcode[pil]
 opencv-python-headless
 pyzbar
 fpdf
+streamlit-qrcode-scanner
