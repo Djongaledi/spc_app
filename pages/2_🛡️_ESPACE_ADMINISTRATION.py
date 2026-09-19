@@ -68,7 +68,6 @@ def generer_pdf_presences(df_presences, titre="Registre des Apprenants"):
                 pdf.cell(col_width, 7, valeur, 1, 0, 'C')
             pdf.ln()
 
-    # Génération binaire sécurisée
     pdf_output = pdf.output(dest='S')
     if isinstance(pdf_output, str):
         return pdf_output.encode('latin-1', 'replace')
@@ -249,7 +248,7 @@ else:
         c1.metric(label="👥 Total Apprenants Inscrits", value=total_apprenants)
         c2.metric(label="✅ Présences Enregistrées Aujourd'hui", value=presences_today)
 
-    # --- TAB 3 : INSCRIPTION ---
+    # --- TAB 3 : INSCRIPTION (CORRIGÉ : VÉRIFICATION DES DOUBLONS) ---
     with tab3:
         st.subheader("➕ Formulaire d'Inscription Apprenant")
         with st.form("form_admin_inscription", clear_on_submit=True):
@@ -257,19 +256,30 @@ else:
             sexe = st.selectbox("Sexe", ["Masculin", "Féminin"])
             niveau = st.selectbox("Niveau d'étude / Groupe", NIVEAUX_SPC)
             submitted = st.form_submit_button("💾 Enregistrer l'Inscription")
+        
         if submitted:
-            if nom.strip() != "":
-                matricule = f"SPC-{random.randint(1000, 9999)}"
-                date_inscription = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            nom_clean = nom.strip()
+            if nom_clean != "":
                 conn = sqlite3.connect(DB_NAME)
                 c = conn.cursor()
-                c.execute(
-                    "INSERT INTO apprenants (matricule, nom, sexe, niveau, qr_code_path, date_inscription) VALUES (?, ?, ?, ?, ?, ?)",
-                    (matricule, nom, sexe, niveau, matricule, date_inscription)
-                )
-                conn.commit()
-                conn.close()
-                st.success(f"🎉 Apprenant **{nom}** inscrit avec succès ! Matricule attribué : **{matricule}**")
+                
+                # Vérification si un apprenant porte déjà le même nom (insensible à la casse)
+                c.execute("SELECT matricule FROM apprenants WHERE LOWER(nom) = LOWER(?)", (nom_clean,))
+                existe_deja = c.fetchone()
+                
+                if existe_deja:
+                    st.error(f"⚠️ **Inscription refusée** : Un apprenant du nom de **'{nom_clean}'** existe déjà avec le matricule **{existe_deja[0]}**.")
+                    conn.close()
+                else:
+                    matricule = f"SPC-{random.randint(1000, 9999)}"
+                    date_inscription = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    c.execute(
+                        "INSERT INTO apprenants (matricule, nom, sexe, niveau, qr_code_path, date_inscription) VALUES (?, ?, ?, ?, ?, ?)",
+                        (matricule, nom_clean, sexe, niveau, matricule, date_inscription)
+                    )
+                    conn.commit()
+                    conn.close()
+                    st.success(f"🎉 Apprenant **{nom_clean}** inscrit avec succès ! Matricule attribué : **{matricule}**")
             else:
                 st.error("Veuillez saisir un nom valide.")
 
