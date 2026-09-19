@@ -12,9 +12,56 @@ from utils_qr import generer_qr_code
 
 st.set_page_config(page_title="Accueil & Espace Apprenant - SPC", page_icon="🎓", layout="wide")
 
+# --- STYLES CSS PERSONNALISÉS (BARRE LATÉRALE ET EN-TÊTE) ---
 st.markdown("""
     <style>
-    .stApp { background-color: #F8FAFC; }
+    /* Fond principal de l'application */
+    .stApp { 
+        background-color: #F8FAFC; 
+    }
+
+    /* Style complet de la Barre Latérale (Sidebar) */
+    section[data-testid="stSidebar"] {
+        background-color: #0F172A !important;
+        border-right: 3px solid #F59E0B !important;
+    }
+
+    /* Couleurs des textes et icônes dans la barre latérale */
+    section[data-testid="stSidebar"] *, 
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] div {
+        color: #FFFFFF !important;
+    }
+
+    /* Style des liens de navigation dans le menu latéral */
+    section[data-testid="stSidebar"] ul li div a {
+        background-color: #1E293B !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+        margin-bottom: 8px !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        border-left: 4px solid transparent !important;
+        transition: all 0.3s ease !important;
+    }
+
+    /* Survol des liens du menu latéral */
+    section[data-testid="stSidebar"] ul li div a:hover {
+        background-color: #334155 !important;
+        border-left: 4px solid #F59E0B !important;
+    }
+
+    /* Bouton de la PAGE ACTIVE (ACCUEIL & ESPACE APPRENANT) en orange */
+    section[data-testid="stSidebar"] ul li div a[aria-current="page"] {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+        color: #0F172A !important;
+        font-weight: 800 !important;
+        border-left: 4px solid #FFFFFF !important;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.25) !important;
+    }
+
+    /* En-tête principal */
     .main-header {
         background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
         padding: 30px;
@@ -24,6 +71,8 @@ st.markdown("""
         margin-bottom: 25px;
         border: 2px solid #F59E0B;
     }
+
+    /* Boutons globaux */
     .stButton>button, div[data-testid="stFormSubmitButton"]>button {
         background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
         color: #0F172A !important;
@@ -44,7 +93,7 @@ st.markdown("""
 
 tab_inscription, tab_carte = st.tabs(["📝 Formulaire d'Inscription", "🪪 Obtenir ma Carte & QR Code"])
 
-# --- ONGLE 1 : INSCRIPTION AVEC BLOCAGE DES DOUBLONS ---
+# --- ONGLET 1 : INSCRIPTION AVEC BLOCAGE DES DOUBLONS ---
 with tab_inscription:
     st.subheader("📝 Inscription des Apprenants")
     st.write("Veuillez remplir vos informations pour vous inscrire au centre.")
@@ -84,7 +133,7 @@ with tab_inscription:
         else:
             st.error("❌ Veuillez saisir un nom valide avant de valider.")
 
-# --- ONGLE 2 : OBTENIR SA CARTE ET QR CODE ---
+# --- ONGLET 2 : OBTENIR SA CARTE ET QR CODE ---
 with tab_carte:
     st.subheader("🪪 Récupérer sa Carte / QR Code")
     st.write("Entrez votre matricule pour afficher votre QR Code de présence.")
