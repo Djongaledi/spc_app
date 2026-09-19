@@ -39,7 +39,6 @@ st.markdown("""
         padding: 10px 20px !important;
         box-shadow: 0px 4px 10px rgba(245, 158, 11, 0.3) !important;
     }
-
     /* EN-TÊTE ADMIN ENCADRÉ */
     .admin-header {
         background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
@@ -51,7 +50,6 @@ st.markdown("""
         margin-bottom: 25px;
         border: 2px solid #F59E0B;
     }
-
     .login-box {
         background: white;
         padding: 30px;
@@ -61,7 +59,6 @@ st.markdown("""
         max-width: 450px;
         margin: auto;
     }
-
     th {
         background-color: #1E3A8A !important;
         color: #F59E0B !important;
@@ -128,7 +125,6 @@ else:
             <p style="margin:5px 0 0 0; color:#FBBF24;">"if you're reach, be the bridge"</p>
         </div>
     """, unsafe_allow_html=True)
-
     col_space, col_logout = st.columns([5, 1])
     with col_logout:
         if st.button("🚪 Déconnexion"):
@@ -147,13 +143,11 @@ else:
         st.subheader("📷 Contrôle des Entrées par QR Code")
         col_scan, col_manual = st.columns([3, 2])
         matricule_scanne = None
-
         with col_scan:
             if qrcode_scanner is not None:
                 matricule_scanne = qrcode_scanner(key="qr_scanner_admin")
             else:
                 st.warning("⚠️ Installez le scanner : `pip install streamlit-qrcode-scanner`")
-
         with col_manual:
             st.markdown("##### ⌨️ Saisie Manuelle de Secours")
             with st.form("form_presence_admin", clear_on_submit=True):
@@ -161,7 +155,6 @@ else:
                 submit_presence = st.form_submit_button("✅ Marquer Présent Manuellement")
 
         target_matricule = matricule_scanne if matricule_scanne else (matricule_saisi if submit_presence else None)
-
         if target_matricule:
             target_matricule = target_matricule.strip()
             conn = sqlite3.connect(DB_NAME)
@@ -203,7 +196,6 @@ else:
         """
         df_today = pd.read_sql_query(query_today, conn, params=(datetime.now().strftime("%Y-%m-%d"),))
         conn.close()
-
         if not df_today.empty:
             st.dataframe(df_today, use_container_width=True)
         else:
@@ -217,7 +209,6 @@ else:
         today_str = datetime.now().strftime("%Y-%m-%d")
         presences_today = pd.read_sql_query("SELECT COUNT(*) AS total FROM presences WHERE date_presence = ?", conn, params=(today_str,)).iloc[0]['total']
         conn.close()
-
         c1, c2 = st.columns(2)
         c1.metric(label="👥 Total Apprenants Inscrits", value=total_apprenants)
         c2.metric(label="✅ Présences Enregistrées Aujourd'hui", value=presences_today)
@@ -230,7 +221,6 @@ else:
             sexe = st.selectbox("Sexe", ["Masculin", "Féminin"])
             niveau = st.selectbox("Niveau d'étude / Groupe", NIVEAUX_SPC)
             submitted = st.form_submit_button("💾 Enregistrer l'Inscription")
-
         if submitted:
             if nom.strip() != "":
                 matricule = f"SPC-{random.randint(1000, 9999)}"
@@ -259,6 +249,21 @@ else:
             
             st.dataframe(df_apprenants, use_container_width=True)
 
+            # --- BOUTON D'IMPRESSION PDF POUR LE REGISTRE GLOBAL ---
+            if not df_apprenants.empty:
+                try:
+                    pdf_data_global = generer_pdf_presences(df_apprenants, titre="Registre Global des Apprenants")
+                    bytes_global = bytes(pdf_data_global) if not isinstance(pdf_data_global, bytes) else pdf_data_global
+                    
+                    st.download_button(
+                        label="📄 Imprimer / Télécharger le Registre (PDF)",
+                        data=bytes_global,
+                        file_name=f"registre_global_SPC_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf"
+                    )
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération du PDF du Registre : {e}")
+
             # --- MODULE DE SUPPRESSION APPRENANTS ---
             st.write("---")
             st.markdown("<h4 style='color:#DC2626;'>🗑️ Zone de Suppression d'un Apprenant</h4>", unsafe_allow_html=True)
@@ -280,7 +285,6 @@ else:
                     mat_del = apprenant_to_delete.split(" - ")[0]
                     conn = sqlite3.connect(DB_NAME)
                     c = conn.cursor()
-                    # Suppression dans la table des presences et des apprenants
                     c.execute("DELETE FROM presences WHERE matricule = ?", (mat_del,))
                     c.execute("DELETE FROM apprenants WHERE matricule = ?", (mat_del,))
                     conn.commit()
@@ -318,19 +322,19 @@ else:
             
             df_filtered = pd.read_sql_query(query, conn, params=params)
             conn.close()
-
-            # Affichage sans la colonne ID brute
+            
             df_display = df_filtered.drop(columns=['id']) if 'id' in df_filtered.columns else df_filtered
             st.dataframe(df_display, use_container_width=True)
 
+            # --- BOUTON D'IMPRESSION PDF POUR L'HISTORIQUE FILTRÉ ---
             if not df_filtered.empty:
                 try:
-                    pdf_data = generer_pdf_presences(df_display, titre_rapport=f"Rapport des Presences ({filter_niveau})")
-                    pdf_bytes = pdf_data.encode('latin-1', errors='replace') if isinstance(pdf_data, str) else bytes(pdf_data)
-
+                    pdf_data_filtered = generer_pdf_presences(df_display, titre=f"Rapport des Presences ({filter_niveau})")
+                    bytes_filtered = bytes(pdf_data_filtered) if not isinstance(pdf_data_filtered, bytes) else pdf_data_filtered
+                    
                     st.download_button(
                         label="📄 Télécharger le Rapport en PDF",
-                        data=pdf_bytes,
+                        data=bytes_filtered,
                         file_name=f"presences_SPC_{datetime.now().strftime('%Y%m%d')}.pdf",
                         mime="application/pdf"
                     )
@@ -344,7 +348,6 @@ else:
             if not df_filtered.empty:
                 col_p_del1, col_p_del2 = st.columns([3, 1])
                 with col_p_del1:
-                    # Formater une chaîne compréhensible pour l'utilisateur
                     options_presences = {
                         f"ID: {row['id']} | {row['nom']} ({row['matricule']}) - {row['date_presence']} à {row['heure_presence']}": row['id']
                         for _, row in df_filtered.iterrows()
@@ -358,7 +361,6 @@ else:
                     st.write(" ")
                     st.write(" ")
                     btn_delete_presence = st.button("🗑️ Supprimer la Présence", key="btn_del_presence")
-
                 if btn_delete_presence:
                     presence_id = options_presences[selected_presence_label]
                     conn = sqlite3.connect(DB_NAME)
@@ -370,3 +372,8 @@ else:
                     st.rerun()
             else:
                 st.info("Aucune présence enregistrée.")
+
+
+
+
+
