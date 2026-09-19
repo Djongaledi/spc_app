@@ -5,6 +5,7 @@ import random
 from datetime import datetime
 import sys
 import os
+from fpdf import FPDF
 
 try:
     from streamlit_qrcode_scanner import qrcode_scanner
@@ -14,11 +15,67 @@ except ImportError:
 sys.path.append(os.path.abspath(".."))
 from database import NIVEAUX_SPC, DB_NAME
 from utils_qr import generer_qr_code
-from utils_pdf import generer_pdf_presences
 
+# --- FONCTION SECURISEE POUR LA GENERATION DE PDF ---
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 14)
+        self.cell(0, 10, 'SMART PEOPLE CENTER (SPC)', 0, 1, 'C')
+        self.set_font('Arial', 'I', 10)
+        self.cell(0, 5, 'Rapport & Registre des Apprenants / Presences', 0, 1, 'C')
+        self.ln(6)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+
+def clean_txt(text):
+    if text is None:
+        return ""
+    return str(text).encode('latin-1', 'replace').decode('latin-1')
+
+def generer_pdf_presences(df_presences, titre="Registre des Apprenants"):
+    pdf = PDFReport()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 8, clean_txt(titre), 0, 1, 'L')
+    pdf.ln(2)
+
+    if df_presences.empty:
+        pdf.set_font('Arial', 'I', 10)
+        pdf.cell(0, 8, "Aucune donnee disponible.", 0, 1, 'L')
+    else:
+        cols = [c for c in df_presences.columns if c.lower() != 'id']
+        nb_cols = len(cols)
+        col_width = 190 / nb_cols if nb_cols > 0 else 190
+
+        pdf.set_font('Arial', 'B', 9)
+        pdf.set_fill_color(220, 220, 220)
+        for col in cols:
+            pdf.cell(col_width, 8, clean_txt(col.upper()), 1, 0, 'C', True)
+        pdf.ln()
+
+        pdf.set_font('Arial', '', 8)
+        for _, row in df_presences.iterrows():
+            for col in cols:
+                valeur = clean_txt(row.get(col, ''))
+                if len(valeur) > 28:
+                    valeur = valeur[:25] + "..."
+                pdf.cell(col_width, 7, valeur, 1, 0, 'C')
+            pdf.ln()
+
+    output = pdf.output()
+    if isinstance(output, str):
+        return output.encode('latin-1', 'replace')
+    return bytes(output)
+
+
+# --- CONFIGURATION PAGE ET CSS ---
 st.set_page_config(page_title="Espace Administration - SPC", page_icon="🛡️", layout="wide")
 
-# CSS personnalisé
 st.markdown("""
     <style>
     .stApp { background-color: #F8FAFC; }
@@ -249,22 +306,20 @@ else:
             
             st.dataframe(df_apprenants, use_container_width=True)
 
-            # --- BOUTON D'IMPRESSION PDF POUR LE REGISTRE GLOBAL ---
+            # BOUTON D'IMPRESSION PDF POUR LE REGISTRE GLOBAL
             if not df_apprenants.empty:
                 try:
-                    pdf_data_global = generer_pdf_presences(df_apprenants, titre="Registre Global des Apprenants")
-                    bytes_global = bytes(pdf_data_global) if not isinstance(pdf_data_global, bytes) else pdf_data_global
-                    
+                    pdf_bytes = generer_pdf_presences(df_apprenants, titre="Registre Global des Apprenants")
                     st.download_button(
                         label="📄 Imprimer / Télécharger le Registre (PDF)",
-                        data=bytes_global,
+                        data=pdf_bytes,
                         file_name=f"registre_global_SPC_{datetime.now().strftime('%Y%m%d')}.pdf",
                         mime="application/pdf"
                     )
                 except Exception as e:
                     st.error(f"Erreur lors de la génération du PDF du Registre : {e}")
 
-            # --- MODULE DE SUPPRESSION APPRENANTS ---
+            # MODULE DE SUPPRESSION APPRENANTS
             st.write("---")
             st.markdown("<h4 style='color:#DC2626;'>🗑️ Zone de Suppression d'un Apprenant</h4>", unsafe_allow_html=True)
             
@@ -326,22 +381,20 @@ else:
             df_display = df_filtered.drop(columns=['id']) if 'id' in df_filtered.columns else df_filtered
             st.dataframe(df_display, use_container_width=True)
 
-            # --- BOUTON D'IMPRESSION PDF POUR L'HISTORIQUE FILTRÉ ---
+            # BOUTON D'IMPRESSION PDF POUR L'HISTORIQUE FILTRÉ
             if not df_filtered.empty:
                 try:
-                    pdf_data_filtered = generer_pdf_presences(df_display, titre=f"Rapport des Presences ({filter_niveau})")
-                    bytes_filtered = bytes(pdf_data_filtered) if not isinstance(pdf_data_filtered, bytes) else pdf_data_filtered
-                    
+                    pdf_bytes_filtred = generer_pdf_presences(df_display, titre=f"Rapport des Presences ({filter_niveau})")
                     st.download_button(
                         label="📄 Télécharger le Rapport en PDF",
-                        data=bytes_filtered,
+                        data=pdf_bytes_filtred,
                         file_name=f"presences_SPC_{datetime.now().strftime('%Y%m%d')}.pdf",
                         mime="application/pdf"
                     )
                 except Exception as e:
                     st.error(f"Erreur PDF : {e}")
 
-            # --- MODULE DE SUPPRESSION DES PRÉSENCES ---
+            # MODULE DE SUPPRESSION DES PRÉSENCES
             st.write("---")
             st.markdown("<h4 style='color:#DC2626;'>🗑️ Zone de Suppression d'une Présence</h4>", unsafe_allow_html=True)
             
