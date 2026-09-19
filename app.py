@@ -3,179 +3,119 @@ import sqlite3
 import pandas as pd
 import random
 from datetime import datetime
+import os
+import sys
+
+# Importation du nom de la BDD et des niveaux
 from database import DB_NAME, NIVEAUX_SPC
 from utils_qr import generer_qr_code
 
-# Configuration de la page
-st.set_page_config(
-    page_title="Smart People Center (SPC)",
-    page_icon="🎓",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Accueil & Espace Apprenant - SPC", page_icon="🎓", layout="wide")
 
-# Correction CSS : Menu latéral lisible et style global
 st.markdown("""
     <style>
     .stApp { background-color: #F8FAFC; }
-    
-    /* MENU LATÉRAL - Visibilité optimale */
-    section[data-testid="stSidebar"] {
-        background-color: #0F172A !important;
-        border-right: 3px solid #F59E0B !important;
-    }
-    
-    section[data-testid="stSidebar"] * {
-        color: #FFFFFF !important;
-    }
-    
-    section[data-testid="stSidebar"] a {
-        background-color: #1E293B !important;
-        color: #FFFFFF !important;
-        font-size: 0.95rem !important;
-        font-weight: 700 !important;
-        padding: 12px 16px !important;
-        border-radius: 8px !important;
-        border-left: 4px solid #F59E0B !important;
-        margin-bottom: 10px !important;
-    }
-
-    section[data-testid="stSidebar"] a:hover {
-        background-color: #F59E0B !important;
-        color: #0F172A !important;
-    }
-
-    /* Style des boutons principal et téléchargement */
-    .stButton>button, div[data-testid="stFormSubmitButton"]>button, .stDownloadButton>button {
-        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
-        color: #0F172A !important;
-        font-weight: 800 !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 10px 20px !important;
-        width: 100%;
-    }
-
-    /* Header Banner */
-    .header-banner {
-        background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
-        padding: 25px;
+    .main-header {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
+        padding: 30px;
         border-radius: 16px;
         color: white;
         text-align: center;
         margin-bottom: 25px;
         border: 2px solid #F59E0B;
     }
-    .header-title { font-size: 2.2rem; font-weight: 800; }
-    .header-subtitle { font-size: 1.1rem; color: #FBBF24; font-style: italic; }
-
-    /* Cartes */
-    .custom-card {
-        background-color: #FFFFFF;
-        padding: 25px;
-        border-radius: 12px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    .stButton>button, div[data-testid="stFormSubmitButton"]>button {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+        color: #0F172A !important;
+        font-weight: 800 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Barre latérale
-with st.sidebar:
-    st.markdown("""
-        <div style="text-align:center; padding: 10px 0;">
-            <h2 style="color:#F59E0B !important; margin:0; font-size:1.3rem;">📍 NAVIGATION</h2>
-            <p style="font-size:0.8rem; color:#CBD5E1 !important;">Smart People Center</p>
-        </div>
-        <hr style="border-color:#334155; margin-bottom: 15px;">
-    """, unsafe_allow_html=True)
-
-# En-tête principal
 st.markdown("""
-    <div class="header-banner">
-        <div class="header-title">🎓 Smart People Center (SPC)</div>
-        <div class="header-subtitle">"if you're reach, be the bridge"</div>
+    <div class="main-header">
+        <h1 style="margin:0; font-size:2.3rem; font-weight:800;">🎓 SMART PEOPLE CENTER (SPC)</h1>
+        <p style="margin:5px 0 0 0; color:#FBBF24;">"if you're reach, be the bridge"</p>
     </div>
 """, unsafe_allow_html=True)
 
-# Disposition en 2 colonnes
-col_inscription, col_admin_info = st.columns([3, 2])
+tab_inscription, tab_carte = st.tabs(["📝 Formulaire d'Inscription", "🪪 Obtenir ma Carte & QR Code"])
 
-# --- COLONNE DE GAUCHE : CRÉATION DE PROFIL DIRECTE ---
-with col_inscription:
-    st.markdown("""
-        <div class="custom-card" style="border-left: 5px solid #F59E0B;">
-            <h3 style="color:#1E3A8A; margin-top:0;">📝 Créer Mon Profil Apprenant</h3>
-            <p style="color:#64748B; font-size:0.9rem;">Remplissez le formulaire ci-dessous pour générer automatiquement votre matricule et votre badge QR Code.</p>
-        </div>
-    """, unsafe_allow_html=True)
-    st.write("")
+# --- ONGLE 1 : INSCRIPTION AVEC BLOCAGE DES DOUBLONS ---
+with tab_inscription:
+    st.subheader("📝 Inscription des Apprenants")
+    st.write("Veuillez remplir vos informations pour vous inscrire au centre.")
 
-    with st.form("form_creation_profil_accueil", clear_on_submit=False):
-        nom_apprenant = st.text_input("Nom complet (Prénom et Nom)", placeholder="Ex: Jean Dupont")
-        sexe_apprenant = st.selectbox("Sexe", ["Masculin", "Féminin"])
-        niveau_apprenant = st.selectbox("Niveau / Classe", NIVEAUX_SPC)
-        
-        btn_submit = st.form_submit_button("🚀 Valider & Générer Mon QR Code")
+    with st.form("form_apprenant_inscription", clear_on_submit=True):
+        nom = st.text_input("Nom complet (Nom, Postnom, Prénom)")
+        sexe = st.selectbox("Sexe", ["Masculin", "Féminin"])
+        niveau = st.selectbox("Niveau d'étude / Groupe", NIVEAUX_SPC)
+        submitted = st.form_submit_button("💾 S'inscrire")
 
-    if btn_submit:
-        if nom_apprenant.strip() != "":
-            # Génération automatique du matricule unique
-            matricule_genere = f"SPC-{random.randint(1000, 9999)}"
-            date_inscription = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # Enregistrement dans SQLite
+    if submitted:
+        nom_clean = nom.strip()
+        if nom_clean != "":
             conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO apprenants (matricule, nom, sexe, niveau, qr_code_path, date_inscription) VALUES (?, ?, ?, ?, ?, ?)",
-                (matricule_genere, nom_apprenant, sexe_apprenant, niveau_apprenant, matricule_genere, date_inscription)
-            )
-            conn.commit()
+            c = conn.cursor()
+
+            # Vérification stricte si le nom existe déjà dans la base
+            c.execute("SELECT matricule FROM apprenants WHERE LOWER(nom) = LOWER(?)", (nom_clean,))
+            existe_deja = c.fetchone()
+
+            if existe_deja:
+                st.error(f"⚠️ **Inscription impossible** : Un apprenant avec le nom **'{nom_clean}'** est déjà inscrit dans le système avec le matricule **{existe_deja[0]}**.")
+                conn.close()
+            else:
+                matricule = f"SPC-{random.randint(1000, 9999)}"
+                date_inscription = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                c.execute(
+                    "INSERT INTO apprenants (matricule, nom, sexe, niveau, qr_code_path, date_inscription) VALUES (?, ?, ?, ?, ?, ?)",
+                    (matricule, nom_clean, sexe, niveau, matricule, date_inscription)
+                )
+                conn.commit()
+                conn.close()
+
+                st.success(f"🎉 **Félicitations {nom_clean} !** Votre inscription est réussie.")
+                st.info(f"📌 Votre matricule est : **{matricule}**. Conservez-le précieusement pour afficher votre carte.")
+        else:
+            st.error("❌ Veuillez saisir un nom valide avant de valider.")
+
+# --- ONGLE 2 : OBTENIR SA CARTE ET QR CODE ---
+with tab_carte:
+    st.subheader("🪪 Récupérer sa Carte / QR Code")
+    st.write("Entrez votre matricule pour afficher votre QR Code de présence.")
+
+    mat_recherche = st.text_input("Entrez votre Matricule (ex: SPC-4825)").strip()
+    if st.button("🔍 Chercher ma Carte"):
+        if mat_recherche:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("SELECT matricule, nom, sexe, niveau FROM apprenants WHERE UPPER(matricule) = UPPER(?)", (mat_recherche,))
+            apprenant = c.fetchone()
             conn.close()
 
-            st.balloons()
-            st.success(f"🎉 Profil créé avec succès ! Votre matricule est : **{matricule_genere}**")
+            if apprenant:
+                mat, nom_app, sexe_app, niv_app = apprenant
+                st.success(f"Bienvenue, **{nom_app}** !")
+                
+                col_info, col_qr = st.columns(2)
+                with col_info:
+                    st.write(f"**Matricule :** {mat}")
+                    st.write(f"**Nom :** {nom_app}")
+                    st.write(f"**Sexe :** {sexe_app}")
+                    st.write(f"**Niveau :** {niv_app}")
 
-            # Génération du QR code en binaire
-            qr_data = generer_qr_code(matricule_genere)
-
-            # Affichage du profil et du bouton de téléchargement
-            st.markdown("---")
-            col_qr_img, col_qr_details = st.columns([1, 2])
-            
-            with col_qr_img:
-                st.image(qr_data, caption=f"QR Code: {matricule_genere}", width=180)
-                st.download_button(
-                    label="📥 Télécharger Mon QR Code",
-                    data=qr_data,
-                    file_name=f"QR_Code_{matricule_genere}.png",
-                    mime="image/png"
-                )
-
-            with col_qr_details:
-                st.markdown(f"### 🪪 Vos Informations :")
-                st.markdown(f"- **Nom :** {nom_apprenant}")
-                st.markdown(f"- **Matricule :** `{matricule_genere}`")
-                st.markdown(f"- **Niveau :** {niveau_apprenant}")
-                st.info("💡 Enregistrez votre QR Code sur votre téléphone pour faire scanner votre présence à l'entrée.")
+                with col_qr:
+                    qr_img = generer_qr_code(mat)
+                    st.image(qr_img, caption=f"QR Code de {nom_app}", width=200)
+            else:
+                st.error("❌ Aucun apprenant trouvé avec ce matricule.")
         else:
-            st.warning("⚠️ Veuillez entrer votre nom complet avant de valider.")
-
-# --- COLONNE DE DROITE : ESPACE ADMINISTRATION & INFOS ---
-with col_admin_info:
-    st.markdown("""
-        <div class="custom-card" style="border-left: 5px solid #1E3A8A;">
-            <h3 style="color:#1E3A8A; margin-top:0;">🔵 Espace Administration</h3>
-            <p style="color:#64748B; font-size:0.9rem;">Réservé au personnel et administrateurs pour la gestion des présences.</p>
-            <ul style="color:#475569; font-size:0.88rem; padding-left: 20px;">
-                <li>Scan automatique des QR Codes à l'entrée</li>
-                <li>Consultation et recherche des apprenants</li>
-                <li>Statistiques globales et rapports PDF</li>
-            </ul>
-        </div>
-    """, unsafe_allow_html=True)
-
+            st.warning("Veuillez saisir un matricule.")
 
 
 
