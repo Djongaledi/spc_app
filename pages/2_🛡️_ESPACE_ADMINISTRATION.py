@@ -4,14 +4,13 @@ import pandas as pd
 import random
 from datetime import datetime
 import base64
-from io import BytesIO
 
 from database import DB_NAME, NIVEAUX_SPC
 from utils_qr import generer_qr_code
 
 st.set_page_config(page_title="Espace Administration - SPC", page_icon="🔑", layout="wide")
 
-# CSS de la barre latérale et des éléments de page
+# --- STYLES CSS PERSONNALISÉS DE L'APPLICATION ---
 st.markdown("""
     <style>
     .stApp { background-color: #F8FAFC; }
@@ -65,7 +64,87 @@ tab_scan, tab_stats, tab_inscrire, tab_cartes, tab_lists = st.tabs([
     "📋 Listes & Exports PDF"
 ])
 
-# --- ONGLET 3 : INSCRIPTION APPRENANT (RÉSERVÉ À L'ADMIN) ---
+# --- ONGLET 1 : SCANNER & PRÉSENCES ---
+with tab_scan:
+    st.subheader("📸 Saisie des Présences via QR Code ou Matricule")
+    
+    col_input, col_action = st.columns([2, 1])
+    with col_input:
+        mat_scan = st.text_input("Saisir ou scanner le Matricule (ex: SPC-1234)").strip()
+    
+    if st.button("✅ Enregistrer Présence"):
+        if mat_scan:
+            conn = sqlite3.connect(DB_NAME)
+            c = conn.cursor()
+            c.execute("SELECT matricule, nom, niveau FROM apprenants WHERE UPPER(matricule) = UPPER(?)", (mat_scan,))
+            apprenant = c.fetchone()
+
+            if apprenant:
+                mat_found, nom_app, niv_app = apprenant
+                date_jour = datetime.now().strftime("%Y-%m-%d")
+                heure_actuelle = datetime.now().strftime("%H:%M:%S")
+
+                c.execute("SELECT id FROM presences WHERE matricule = ? AND date_presence = ?", (mat_found, date_jour))
+                deja_present = c.fetchone()
+
+                if deja_present:
+                    st.warning(f"⚠️ **{nom_app}** est déjà marqué présent aujourd'hui ({date_jour}).")
+                else:
+                    c.execute(
+                        "INSERT INTO presences (matricule, date_presence, heure_presence) VALUES (?, ?, ?)",
+                        (mat_found, date_jour, heure_actuelle)
+                    )
+                    conn.commit()
+                    st.success(f"🎉 Présence enregistrée avec succès pour **{nom_app}** à {heure_actuelle} !")
+            else:
+                st.error("❌ Aucun apprenant trouvé avec ce matricule.")
+            conn.close()
+        else:
+            st.warning("Veuillez saisir un matricule.")
+
+    st.markdown("---")
+    st.write("### 📅 Registre des Présences du Jour")
+    conn = sqlite3.connect(DB_NAME)
+    date_jour = datetime.now().strftime("%Y-%m-%d")
+    df_presences = pd.read_sql_query("""
+        SELECT p.id, a.matricule, a.nom, a.niveau, p.date_presence, p.heure_presence 
+        FROM presences p
+        JOIN apprenants a ON p.matricule = a.matricule
+        WHERE p.date_presence = ?
+        ORDER BY p.heure_presence DESC
+    """, conn, params=(date_jour,))
+    conn.close()
+
+    if not df_presences.empty:
+        st.dataframe(df_presences, use_container_width=True)
+    else:
+        st.info("Aucune présence enregistrée aujourd'hui.")
+
+# --- ONGLET 2 : STATISTIQUES & DASHBOARD ---
+with tab_stats:
+    st.subheader("📊 Tableau de Bord & Statistiques")
+    
+    conn = sqlite3.connect(DB_NAME)
+    total_apprenants = pd.read_sql_query("SELECT COUNT(*) as total FROM apprenants", conn).iloc[0]['total']
+    
+    date_jour = datetime.now().strftime("%Y-%m-%d")
+    presences_today = pd.read_sql_query("SELECT COUNT(*) as total FROM presences WHERE date_presence = ?", conn, params=(date_jour,)).iloc[0]['total']
+    
+    col1, col2 = st.columns(2)
+    col1.metric("Total Apprenants Inscrits", total_apprenants)
+    col2.metric("Présences Aujourd'hui", presences_today)
+
+    st.markdown("---")
+    st.write("### 📈 Répartition des Apprenants par Niveau")
+    df_niveaux = pd.read_sql_query("SELECT niveau, COUNT(*) as Effectif FROM apprenants GROUP BY niveau", conn)
+    conn.close()
+
+    if not df_niveaux.empty:
+        st.bar_chart(df_niveaux.set_index("niveau"))
+    else:
+        st.info("Aucune donnée disponible.")
+
+# --- ONGLET 3 : INSCRIPTION APPRENANT ---
 with tab_inscrire:
     st.subheader("➕ Formulaire d'Inscription Apprenant")
     
@@ -100,18 +179,24 @@ with tab_inscrire:
         else:
             st.error("❌ Veuillez saisir le nom complet.")
 
-# --- ONGLET 4 : IMPRESSION DE LA CARTE APPRENANT (STYLE CARTE D'ÉTUDIANT) ---
+# --- ONGLET 4 : IMPRESSION DE LA CARTE APPRENANT DESIGN PERFECTIONNÉ ---
 with tab_cartes:
-    st.subheader("🪪 Générer et Imprimer la Carte de l'Apprenant")
+    st.subheader("🪪 Générer et Imprimer la Carte d'Apprenant")
     
     conn = sqlite3.connect(DB_NAME)
     df_apprenants = pd.read_sql_query("SELECT matricule, nom FROM apprenants ORDER BY nom ASC", conn)
     conn.close()
 
     if not df_apprenants.empty:
-        options = [f"{row['nom']} ({row['matricule']})" for _, row in df_apprenants.iterrows()]
-        choix = st.selectbox("Sélectionnez l'apprenant :", options)
+        col_sel, col_photo = st.columns([2, 1])
         
+        with col_sel:
+            options = [f"{row['nom']} ({row['matricule']})" for _, row in df_apprenants.iterrows()]
+            choix = st.selectbox("Sélectionnez l'apprenant :", options)
+        
+        with col_photo:
+            uploaded_photo = st.file_uploader("📷 Charger la photo d'identité", type=["jpg", "png", "jpeg"])
+
         if choix:
             mat_sel = choix.split("(")[-1].replace(")", "").strip()
             
@@ -124,15 +209,13 @@ with tab_cartes:
             if app_data:
                 mat, nom_app, sexe_app, niv_app, date_ins = app_data
                 
-                # Option photo d'identité
-                uploaded_photo = st.file_uploader("📷 Charger la photo d'identité de l'apprenant (optionnel)", type=["jpg", "png", "jpeg"])
-                
+                # Traitement de la Photo d'identité
                 if uploaded_photo:
                     photo_bytes = uploaded_photo.getvalue()
                     b64_photo = f"data:image/png;base64,{base64.b64encode(photo_bytes).decode()}"
                 else:
-                    # Photo par défaut si aucune photo n'est chargée
-                    b64_photo = "https://via.placeholder.com/110x130?text=PHOTO"
+                    # Silhouette par défaut professionnelle
+                    b64_photo = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>"
 
                 # Génération QR Code en Base64
                 qr_img = generer_qr_code(mat)
@@ -140,84 +223,143 @@ with tab_cartes:
 
                 annee_scolaire = "2025-2026"
 
-                # Structure de la Carte D'étudiant / Apprenant (CSS HTML inspiré du modèle)
+                # CODE HTML DE LA CARTE AVEC DESIGN AVANCÉ
                 carte_html = f"""
                 <div id="carte-print" style="
-                    width: 380px;
-                    height: 580px;
-                    border: 2px solid #1E3A8A;
-                    border-radius: 12px;
+                    width: 360px;
+                    height: 560px;
+                    border: 2px solid #0F172A;
+                    border-radius: 16px;
                     background: #FFFFFF;
-                    font-family: 'Arial', sans-serif;
-                    padding: 15px;
-                    box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    box-shadow: 0px 8px 20px rgba(15, 23, 42, 0.15);
                     position: relative;
-                    margin: auto;
+                    margin: 10px auto;
+                    overflow: hidden;
                     color: #0F172A;
                 ">
-                    <!-- EN-TÊTE -->
-                    <div style="text-align: center; border-bottom: 2px solid #1E3A8A; padding-bottom: 8px;">
-                        <div style="font-weight: 900; font-size: 14px; color: #1E3A8A; letter-spacing: 0.5px;">CENTRE DE FORMATION</div>
-                        <div style="font-weight: 800; font-size: 16px; color: #F59E0B;">SMART PEOPLE CENTER</div>
-                        <div style="font-size: 11px; font-weight: bold; color: #1E3A8A; margin-top: 4px; text-transform: uppercase; background: #EEF2FF; padding: 2px 6px; border-radius: 4px; display: inline-block;">
-                            CARTE D'APPRENANT
+                    <!-- BANDEAU SUPÉRIEUR -->
+                    <div style="
+                        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
+                        padding: 16px 10px 12px 10px;
+                        text-align: center;
+                        color: #FFFFFF;
+                        border-bottom: 4px solid #F59E0B;
+                    ">
+                        <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; opacity: 0.9; text-transform: uppercase;">TRAINING CENTER</div>
+                        <div style="font-size: 17px; font-weight: 900; color: #F59E0B; margin-top: 2px; letter-spacing: 0.5px;">SMART PEOPLE CENTER</div>
+                        <div style="font-size: 10px; font-weight: 800; color: #0F172A; background: #FBBF24; display: inline-block; padding: 2px 10px; border-radius: 20px; margin-top: 6px; text-transform: uppercase;">
+                            LEARNER CARD
                         </div>
                     </div>
 
-                    <!-- PHOTO & ANNÉE ACADÉMIQUE -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding: 0 10px;">
-                        <div style="width: 110px; height: 130px; border: 2px solid #CBD5E1; border-radius: 6px; overflow: hidden; background: #F1F5F9;">
+                    <!-- BLOC CORPS : PHOTO & ANNÉE ACADÉMIQUE -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 10px 20px;">
+                        <!-- CADRE PHOTO -->
+                        <div style="
+                            width: 105px;
+                            height: 125px;
+                            border: 3px solid #E2E8F0;
+                            border-radius: 10px;
+                            overflow: hidden;
+                            background: #F8FAFC;
+                            box-shadow: inset 0px 0px 5px rgba(0,0,0,0.05);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        ">
                             <img src="{b64_photo}" style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 12px; font-weight: bold; color: #64748B;">Année d'étude</div>
-                            <div style="font-size: 15px; font-weight: 900; color: #0F172A;">{annee_scolaire}</div>
+
+                        <!-- BLOC ANNÉE D'ÉTUDE -->
+                        <div style="text-align: right; background: #F1F5F9; padding: 10px 14px; border-radius: 10px; border-left: 3px solid #1E3A8A;">
+                            <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Year of Study</div>
+                            <div style="font-size: 15px; font-weight: 900; color: #0F172A; margin-top: 2px;">{annee_scolaire}</div>
                         </div>
                     </div>
 
-                    <!-- INFORMATIONS PERSONNELLES -->
-                    <div style="margin-top: 15px; font-size: 12px; line-height: 1.5;">
-                        <div style="font-size: 11px; font-weight: bold; color: #64748B;">Nom / Postnom / Prénom</div>
-                        <div style="font-weight: 800; font-size: 13px; color: #1E3A8A; margin-bottom: 6px;">{nom_app.upper()}</div>
+                    <!-- BLOC INFORMATIONS APPRENANT -->
+                    <div style="padding: 0 20px; font-size: 12px;">
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Full Name</div>
+                            <div style="font-size: 14px; font-weight: 900; color: #1E3A8A; text-transform: uppercase; line-height: 1.2;">{nom_app}</div>
+                        </div>
 
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; background: #FAF5FF; padding: 8px 12px; border-radius: 8px; border: 1px solid #F3E8FF;">
                             <div>
-                                <span style="font-size: 11px; font-weight: bold; color: #64748B;">Matricule : </span>
-                                <span style="font-weight: 800; color: #D97706;">{mat}</span>
+                                <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Registration No</div>
+                                <div style="font-size: 13px; font-weight: 900; color: #D97706;">{mat}</div>
                             </div>
-                            <div>
-                                <span style="font-size: 11px; font-weight: bold; color: #64748B;">Sexe : </span>
-                                <span style="font-weight: 800;">{sexe_app}</span>
+                            <div style="text-align: right;">
+                                <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Sex</div>
+                                <div style="font-size: 13px; font-weight: 800; color: #0F172A;">{sexe_app}</div>
                             </div>
                         </div>
 
-                        <div style="margin-bottom: 6px;">
-                            <span style="font-size: 11px; font-weight: bold; color: #64748B;">Niveau / Programme : </span><br>
-                            <span style="font-weight: 800; color: #0F172A;">{niv_app}</span>
+                        <div style="margin-bottom: 10px;">
+                            <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Level / Program</div>
+                            <div style="font-size: 12px; font-weight: 800; color: #0F172A;">{niv_app}</div>
                         </div>
                     </div>
 
-                    <!-- QR CODE & PIED DE PAGE -->
-                    <div style="position: absolute; bottom: 15px; left: 15px; right: 15px; text-align: center; border-top: 1px dashed #CBD5E1; padding-top: 10px;">
-                        <img src="{b64_qr}" style="width: 80px; height: 80px;">
-                        <div style="font-size: 9px; color: #64748B; margin-top: 4px;">Valide pour l'année académique en cours</div>
+                    <!-- PIED DE PAGE ET QR CODE -->
+                    <div style="
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        background: #F8FAFC;
+                        border-top: 1px dashed #CBD5E1;
+                        padding: 10px 20px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                    ">
+                        <div style="text-align: left; max-width: 180px;">
+                            <div style="font-size: 8px; color: #64748B; font-weight: 600; line-height: 1.3;">
+                                Official identification card for Smart People Center attendance and verification.
+                            </div>
+                        </div>
+                        <div style="text-align: center;">
+                            <img src="{b64_qr}" style="width: 70px; height: 70px; border-radius: 4px; border: 1px solid #CBD5E1; background: white; padding: 2px;">
+                        </div>
                     </div>
                 </div>
                 """
 
-                # Aperçu visuel de la carte dans Streamlit
-                st.write("### 🖨️ Aperçu de la Carte")
-                st.components.v1.html(carte_html, height=620)
+                st.write("### 🖨️ Aperçu de la Carte D'Apprenant")
+                st.components.v1.html(carte_html, height=600)
 
-                # Bouton pour imprimer la carte directement
                 st.download_button(
-                    label="📥 Télécharger la Carte (HTML/Imprimable)",
+                    label="📥 Télécharger la Carte (Fichier HTML Imprimable)",
                     data=carte_html,
-                    file_name=f"Carte_{mat}.html",
+                    file_name=f"Carte_SPC_{mat}.html",
                     mime="text/html"
                 )
     else:
         st.info("Aucun apprenant enregistré dans la base de données pour l'instant.")
+
+# --- ONGLET 5 : LISTES & EXPORTS PDF ---
+with tab_lists:
+    st.subheader("📋 Consultation des Listes & Exports")
+    
+    conn = sqlite3.connect(DB_NAME)
+    df_all_apprenants = pd.read_sql_query("SELECT matricule, nom, sexe, niveau, date_inscription FROM apprenants ORDER BY nom ASC", conn)
+    conn.close()
+
+    if not df_all_apprenants.empty:
+        st.write("#### 👨🎓 Liste Complète des Apprenants")
+        st.dataframe(df_all_apprenants, use_container_width=True)
+
+        csv_data = df_all_apprenants.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Exporter la Liste en CSV / Excel",
+            data=csv_data,
+            file_name=f"liste_apprenants_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("Aucun apprenant inscrit pour le moment.")
 
 
 
