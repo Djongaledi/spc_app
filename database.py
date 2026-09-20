@@ -57,6 +57,7 @@ NIVEAUX_SPC = [
     "Second level up",
     "Third level down",
     "Third level up"
+    "Teacher"
 ]
 
 if __name__ == "__main__":
