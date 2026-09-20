@@ -56,7 +56,7 @@ NIVEAUX_SPC = [
     "Second level down",
     "Second level up",
     "Third level down",
-    "Third level up"
+    "Third level up",
     "Teacher"
 ]
 
