@@ -299,7 +299,7 @@ else:
         conn.close()
 
         if not df_apprenants_carte.empty:
-            col_sel, col_photo = st.columns([2, 1])
+            col_sel, col_photo, col_logo = st.columns([2, 1, 1])
             
             with col_sel:
                 options = [f"{row['nom']} ({row['matricule']})" for _, row in df_apprenants_carte.iterrows()]
@@ -307,6 +307,9 @@ else:
             
             with col_photo:
                 uploaded_photo = st.file_uploader("📷 Photo d'identité", type=["jpg", "png", "jpeg"], key="upload_photo_carte")
+
+            with col_logo:
+                uploaded_logo = st.file_uploader("🖼️ Logo SPC", type=["jpg", "png", "jpeg"], key="upload_logo_carte")
 
             if choix:
                 mat_sel = choix.split("(")[-1].replace(")", "").strip()
@@ -321,22 +324,21 @@ else:
                 if app_data:
                     mat, nom_app, sexe_app, niv_app = app_data
                     
-                    # Photo d'identité
+                    # Photo d'identité de l'apprenant
                     if uploaded_photo:
                         photo_bytes = uploaded_photo.getvalue()
                         b64_photo = f"data:image/png;base64,{base64.b64encode(photo_bytes).decode()}"
                     else:
                         b64_photo = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>"
 
-                    # Chargement automatique du logo SPC (pour filigrane et icône en-tête)
-                    b64_bg = ""
-                    for logo_name in ["logo_spc.png", "logo_spc.jpg", "logo.png", "logo.jpg"]:
-                        if os.path.exists(logo_name):
-                            with open(logo_name, "rb") as f:
-                                b64_bg = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-                            break
+                    # Logo SPC uploadé (utilisé à la fois pour l'icône à gauche et le filigrane)
+                    if uploaded_logo:
+                        logo_bytes = uploaded_logo.getvalue()
+                        b64_logo = f"data:image/png;base64,{base64.b64encode(logo_bytes).decode()}"
+                    else:
+                        b64_logo = ""
 
-                    bg_style = f"background-image: url('{b64_bg}');" if b64_bg else ""
+                    bg_style = f"background-image: url('{b64_logo}');" if b64_logo else ""
 
                     # Génération du QR code en base64
                     qr_img = generer_qr_code(mat)
@@ -400,7 +402,7 @@ else:
                                     box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
                                     flex-shrink: 0;
                                 ">
-                                    <img src="{b64_bg}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                    <img src="{b64_logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                                 </div>
 
                                 <!-- TEXTES EN-TÊTE -->
