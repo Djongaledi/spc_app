@@ -5,3 +5,4 @@ opencv-python-headless
 pyzbar
 fpdf
 streamlit-qrcode-scanner
+psycopg2-binary
