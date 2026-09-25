@@ -183,11 +183,31 @@ else:
         st.subheader("📷 Contrôle des Entrées par QR Code")
         col_scan, col_manual = st.columns([3, 2])
         matricule_scanne = None
+        
         with col_scan:
+            st.markdown("##### 🎥 Scan en Direct (Caméra)")
             if qrcode_scanner is not None:
                 matricule_scanne = qrcode_scanner(key="qr_scanner_admin")
             else:
                 st.warning("⚠️ Installez le scanner : pip install streamlit-qrcode-scanner")
+            
+            # Module photo alternatif si la vidéo bloque
+            st.markdown("---")
+            st.markdown("##### 📸 Scan par Photo (Si la vidéo ne charge pas)")
+            img_file_buffer = st.camera_input("Prendre une photo du QR Code", key="cam_native_scan")
+            if img_file_buffer is not None and not matricule_scanne:
+                try:
+                    import cv2
+                    import numpy as np
+                    bytes_data = img_file_buffer.getvalue()
+                    cv2_img = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
+                    detector = cv2.QRCodeDetector()
+                    data, _, _ = detector.detectAndDecode(cv2_img)
+                    if data:
+                        matricule_scanne = data
+                except Exception:
+                    pass
+
         with col_manual:
             st.markdown("##### ⌨️ Saisie Manuelle de Secours")
             with st.form("form_presence_admin", clear_on_submit=True):
@@ -299,17 +319,14 @@ else:
         conn.close()
 
         if not df_apprenants_carte.empty:
-            col_sel, col_photo, col_logo = st.columns([2, 1, 1])
+            col_sel, col_photo = st.columns([2, 1])
             
             with col_sel:
                 options = [f"{row['nom']} ({row['matricule']})" for _, row in df_apprenants_carte.iterrows()]
                 choix = st.selectbox("Sélectionnez l'apprenant :", options, key="select_carte_apprenant")
             
             with col_photo:
-                uploaded_photo = st.file_uploader("📷 Photo d'identité", type=["jpg", "png", "jpeg"], key="upload_photo_carte")
-
-            with col_logo:
-                uploaded_bg = st.file_uploader("🖼️ Logo SPC Arrière-plan", type=["jpg", "png", "jpeg"], key="upload_bg_carte")
+                uploaded_photo = st.file_uploader("📷 Photo d'identité de l'apprenant", type=["jpg", "png", "jpeg"], key="upload_photo_carte")
 
             if choix:
                 mat_sel = choix.split("(")[-1].replace(")", "").strip()
@@ -324,33 +341,30 @@ else:
                 if app_data:
                     mat, nom_app, sexe_app, niv_app = app_data
                     
-                    # Photo d'identité
+                    # Traitement Photo d'identité
                     if uploaded_photo:
                         photo_bytes = uploaded_photo.getvalue()
                         b64_photo = f"data:image/png;base64,{base64.b64encode(photo_bytes).decode()}"
                     else:
                         b64_photo = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>"
 
-                    # Image de fond SPC (Logo blason)
-                    if uploaded_bg:
-                        bg_bytes = uploaded_bg.getvalue()
-                        b64_bg = f"data:image/png;base64,{base64.b64encode(bg_bytes).decode()}"
-                    elif os.path.exists("logo_spc.png"):
-                        with open("logo_spc.png", "rb") as f:
-                            b64_bg = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-                    elif os.path.exists("logo_spc.jpg"):
-                        with open("logo_spc.jpg", "rb") as f:
-                            b64_bg = f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
-                    else:
-                        b64_bg = ""
+                    # Chargement automatique du Blason SPC local ou par lien direct
+                    b64_spc_logo = ""
+                    for logo_name in ["logo_spc.png", "logo_spc.jpg", "logo.png", "logo.jpg"]:
+                        if os.path.exists(logo_name):
+                            with open(logo_name, "rb") as f:
+                                b64_spc_logo = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+                            break
 
-                    # Génération du QR code en base64
+                    # Fallback au cas où l'image locale n'est pas encore posée
+                    if not b64_spc_logo:
+                        b64_spc_logo = "https://raw.githubusercontent.com/votre-repo/main/logo_spc.png"
+
+                    # QR Code
                     qr_img = generer_qr_code(mat)
                     b64_qr = f"data:image/png;base64,{base64.b64encode(qr_img).decode()}"
 
                     annee_scolaire = "2025-2026"
-
-                    bg_style = f"background-image: url('{b64_bg}');" if b64_bg else ""
 
                     carte_html = f"""
                     <div id="carte-print" style="
@@ -366,7 +380,7 @@ else:
                         overflow: hidden;
                         color: #0F172A;
                     ">
-                        <!-- LOGO BLASON EN ARRIÈRE-PLAN (FILIGRANE) -->
+                        <!-- BLASON SPC EN FILIGRANE (ARRIÈRE-PLAN AUTOMATIQUE) -->
                         <div style="
                             position: absolute;
                             top: 55%;
@@ -374,29 +388,50 @@ else:
                             transform: translate(-50%, -40%);
                             width: 270px;
                             height: 330px;
-                            {bg_style}
+                            background-image: url('{b64_spc_logo}');
                             background-size: contain;
                             background-repeat: no-repeat;
                             background-position: center;
-                            opacity: 0.18;
+                            opacity: 0.15;
                             z-index: 1;
                             pointer-events: none;
                         "></div>
 
                         <!-- CONTENU DE LA CARTE -->
                         <div style="position: relative; z-index: 2; height: 100%;">
-                            <!-- BANDEAU SUPÉRIEUR -->
+                            <!-- BANDEAU SUPÉRIEUR AVEC LOGO ICÔNE À GAUCHE -->
                             <div style="
                                 background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
-                                padding: 16px 10px 12px 10px;
-                                text-align: center;
-                                color: #FFFFFF;
+                                padding: 12px 14px;
                                 border-bottom: 4px solid #F59E0B;
+                                display: flex;
+                                align-items: center;
+                                justify-content: flex-start;
+                                gap: 12px;
                             ">
-                                <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; opacity: 0.9; text-transform: uppercase;">TRAINING CENTER</div>
-                                <div style="font-size: 17px; font-weight: 900; color: #F59E0B; margin-top: 2px; letter-spacing: 0.5px;">SMART PEOPLE CENTER</div>
-                                <div style="font-size: 10px; font-weight: 800; color: #0F172A; background: #FBBF24; display: inline-block; padding: 2px 10px; border-radius: 20px; margin-top: 6px; text-transform: uppercase;">
-                                    LEARNER CARD
+                                <!-- ICÔNE LOGO SPC -->
+                                <div style="
+                                    width: 48px;
+                                    height: 48px;
+                                    border-radius: 8px;
+                                    background: #FFFFFF;
+                                    padding: 2px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+                                    flex-shrink: 0;
+                                ">
+                                    <img src="{b64_spc_logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                </div>
+
+                                <!-- TEXTES EN-TÊTE -->
+                                <div style="text-align: left; color: #FFFFFF;">
+                                    <div style="font-size: 10px; font-weight: 700; letter-spacing: 1.2px; opacity: 0.9; text-transform: uppercase;">TRAINING CENTER</div>
+                                    <div style="font-size: 15px; font-weight: 900; color: #F59E0B; letter-spacing: 0.5px; line-height: 1.1;">SMART PEOPLE CENTER</div>
+                                    <div style="font-size: 9px; font-weight: 800; color: #0F172A; background: #FBBF24; display: inline-block; padding: 1px 8px; border-radius: 12px; margin-top: 3px; text-transform: uppercase;">
+                                        LEARNER CARD
+                                    </div>
                                 </div>
                             </div>
 
@@ -417,20 +452,20 @@ else:
                                     <img src="{b64_photo}" style="width: 100%; height: 100%; object-fit: cover;">
                                 </div>
 
-                                <div style="text-align: right; background: rgba(241, 245, 249, 0.85); padding: 10px 14px; border-radius: 10px; border-left: 3px solid #1E3A8A;">
+                                <div style="text-align: right; background: rgba(241, 245, 249, 0.9); padding: 10px 14px; border-radius: 10px; border-left: 3px solid #1E3A8A;">
                                     <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Year of Study</div>
                                     <div style="font-size: 15px; font-weight: 900; color: #0F172A; margin-top: 2px;">{annee_scolaire}</div>
                                 </div>
                             </div>
 
-                            <!-- INFORMATIONS -->
+                            <!-- INFORMATIONS APPRENANT -->
                             <div style="padding: 0 20px; font-size: 12px;">
                                 <div style="margin-bottom: 12px;">
                                     <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Full Name</div>
                                     <div style="font-size: 14px; font-weight: 900; color: #1E3A8A; text-transform: uppercase; line-height: 1.2;">{nom_app}</div>
                                 </div>
 
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; background: rgba(250, 245, 255, 0.85); padding: 8px 12px; border-radius: 8px; border: 1px solid #F3E8FF;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; background: rgba(250, 245, 255, 0.9); padding: 8px 12px; border-radius: 8px; border: 1px solid #F3E8FF;">
                                     <div>
                                         <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Registration No</div>
                                         <div style="font-size: 13px; font-weight: 900; color: #D97706;">{mat}</div>
