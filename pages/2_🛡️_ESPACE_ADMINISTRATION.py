@@ -360,19 +360,19 @@ else:
                         overflow: hidden;
                         color: #0F172A;
                     ">
-                        <!-- LOGO BLASON EN ARRIÈRE-PLAN (FILIGRANE CENTRÉ ET AJUSTÉ) -->
+                        <!-- LOGO BLASON EN ARRIÈRE-PLAN (FILIGRANE RÉDUIT ET PARFAITEMENT CENTRÉ) -->
                         <div style="
                             position: absolute;
                             top: 50%;
                             left: 50%;
                             transform: translate(-50%, -50%);
-                            width: 300px;
-                            height: 380px;
+                            width: 220px;
+                            height: 260px;
                             {bg_style}
                             background-size: contain;
                             background-repeat: no-repeat;
                             background-position: center;
-                            opacity: 0.15;
+                            opacity: 0.13;
                             z-index: 1;
                             pointer-events: none;
                         "></div>
