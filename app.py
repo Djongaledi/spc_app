@@ -1,43 +1,108 @@
 import streamlit as st
-import datetime
-from database import init_db, get_connection
+import pandas as pd
+from database import get_connection, NIVEAUX_SPC
+from utils_qr import generer_qr_code
 
-st.set_page_config(page_title="SPC - Pointage", page_icon="📱", layout="centered")
+st.set_page_config(page_title="Accueil & Espace Apprenant - SPC", page_icon="🎓", layout="wide")
 
-# Initialisation de la base de données PostgreSQL
-init_db()
+# CSS personnalisé pour la barre latérale et l'interface
+st.markdown("""
+    <style>
+    .stApp { background-color: #F8FAFC; }
+    
+    section[data-testid="stSidebar"] {
+        background-color: #0F172A !important;
+        border-right: 3px solid #F59E0B !important;
+    }
 
-st.title("Smart People Center (SPC)")
-st.subheader("Système de Pointage par QR Code")
+    section[data-testid="stSidebar"] *, 
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] div {
+        color: #FFFFFF !important;
+    }
 
-# Saisie du matricule
-matricule = st.text_input("Scannez ou saisissez le matricule :")
+    section[data-testid="stSidebar"] ul li div a {
+        background-color: #1E293B !important;
+        border-radius: 8px !important;
+        padding: 10px 14px !important;
+        margin-bottom: 8px !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        border-left: 4px solid transparent !important;
+    }
 
-if st.button("Enregistrer la présence"):
-    if matricule:
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        # Vérification si l'apprenant existe
-        cursor.execute("SELECT nom, prenom FROM apprenants WHERE matricule = %s", (matricule,))
-        apprenant = cursor.fetchone()
-        
-        if apprenant:
-            maintenant = datetime.datetime.now()
-            date_str = maintenant.strftime("%Y-%m-%d")
-            heure_str = maintenant.strftime("%H:%M:%S")
-            
-            # Insertion du pointage
-            cursor.execute(
-                "INSERT INTO presences (matricule, date, heure, statut) VALUES (%s, %s, %s, %s)",
-                (matricule, date_str, heure_str, "Présent")
+    section[data-testid="stSidebar"] ul li div a[aria-current="page"] {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+        color: #0F172A !important;
+        font-weight: 800 !important;
+        border-left: 4px solid #FFFFFF !important;
+    }
+
+    .main-header {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
+        padding: 30px;
+        border-radius: 16px;
+        color: white;
+        text-align: center;
+        margin-bottom: 25px;
+        border: 2px solid #F59E0B;
+    }
+
+    .stButton>button {
+        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+        color: #0F172A !important;
+        font-weight: 800 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+    <div class="main-header">
+        <h1 style="margin:0; font-size:2.3rem; font-weight:800;">🎓 SMART PEOPLE CENTER (SPC)</h1>
+        <p style="margin:5px 0 0 0; color:#FBBF24;">"if you're reach, be the bridge"</p>
+    </div>
+""", unsafe_allow_html=True)
+
+st.subheader("🪪 Obtenir ma Carte & QR Code")
+st.write("Entrez votre matricule pour afficher vos informations et votre QR Code de présence.")
+
+mat_recherche = st.text_input("Entrez votre Matricule (ex: SPC-4825)").strip()
+
+if st.button("🔍 Chercher ma Carte"):
+    if mat_recherche:
+        try:
+            conn = get_connection()
+            c = conn.cursor()
+            # Requête PostgreSQL paramétrée avec %s et UPPER()
+            c.execute(
+                "SELECT matricule, nom, sexe, niveau FROM apprenants WHERE UPPER(matricule) = UPPER(%s)",
+                (mat_recherche,)
             )
-            conn.commit()
-            st.success(f"Présence enregistrée pour {apprenant[1]} {apprenant[0]} à {heure_str} !")
-        else:
-            st.error("Matricule non reconnu dans le système.")
-            
-        cursor.close()
-        conn.close()
+            apprenant = c.fetchone()
+            c.close()
+            conn.close()
+
+            if apprenant:
+                mat, nom_app, sexe_app, niv_app = apprenant
+                st.success(f"Bienvenue, **{nom_app}** !")
+                
+                col_info, col_qr = st.columns(2)
+                with col_info:
+                    st.write(f"**Matricule :** {mat}")
+                    st.write(f"**Nom complet :** {nom_app}")
+                    st.write(f"**Sexe :** {sexe_app}")
+                    st.write(f"**Niveau / Groupe :** {niv_app}")
+
+                with col_qr:
+                    qr_img = generer_qr_code(mat)
+                    st.image(qr_img, caption=f"QR Code de {nom_app}", width=200)
+            else:
+                st.error("❌ Aucun apprenant trouvé avec ce matricule.")
+        except Exception as e:
+            st.error(f"❌ Erreur lors de la connexion à la base de données : {e}")
     else:
-        st.warning("Veuillez entrer un matricule.")
+        st.warning("Veuillez saisir un matricule.")
