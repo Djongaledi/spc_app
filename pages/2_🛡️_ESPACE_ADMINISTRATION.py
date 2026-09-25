@@ -299,14 +299,17 @@ else:
         conn.close()
 
         if not df_apprenants_carte.empty:
-            col_sel, col_photo = st.columns([2, 1])
+            col_sel, col_photo, col_logo = st.columns([2, 1, 1])
             
             with col_sel:
                 options = [f"{row['nom']} ({row['matricule']})" for _, row in df_apprenants_carte.iterrows()]
                 choix = st.selectbox("Sélectionnez l'apprenant :", options, key="select_carte_apprenant")
             
             with col_photo:
-                uploaded_photo = st.file_uploader("📷 Charger la photo d'identité", type=["jpg", "png", "jpeg"], key="upload_photo_carte")
+                uploaded_photo = st.file_uploader("📷 Photo d'identité", type=["jpg", "png", "jpeg"], key="upload_photo_carte")
+
+            with col_logo:
+                uploaded_bg = st.file_uploader("🖼️ Logo SPC Arrière-plan", type=["jpg", "png", "jpeg"], key="upload_bg_carte")
 
             if choix:
                 mat_sel = choix.split("(")[-1].replace(")", "").strip()
@@ -321,12 +324,25 @@ else:
                 if app_data:
                     mat, nom_app, sexe_app, niv_app = app_data
                     
-                    # Traitement photo
+                    # Photo d'identité
                     if uploaded_photo:
                         photo_bytes = uploaded_photo.getvalue()
                         b64_photo = f"data:image/png;base64,{base64.b64encode(photo_bytes).decode()}"
                     else:
                         b64_photo = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>"
+
+                    # Image de fond SPC (Logo blason)
+                    if uploaded_bg:
+                        bg_bytes = uploaded_bg.getvalue()
+                        b64_bg = f"data:image/png;base64,{base64.b64encode(bg_bytes).decode()}"
+                    elif os.path.exists("logo_spc.png"):
+                        with open("logo_spc.png", "rb") as f:
+                            b64_bg = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+                    elif os.path.exists("logo_spc.jpg"):
+                        with open("logo_spc.jpg", "rb") as f:
+                            b64_bg = f"data:image/jpeg;base64,{base64.b64encode(f.read()).decode()}"
+                    else:
+                        b64_bg = ""
 
                     # Génération du QR code en base64
                     qr_img = generer_qr_code(mat)
@@ -334,13 +350,15 @@ else:
 
                     annee_scolaire = "2025-2026"
 
+                    bg_style = f"background-image: url('{b64_bg}');" if b64_bg else ""
+
                     carte_html = f"""
                     <div id="carte-print" style="
                         width: 360px;
                         height: 560px;
                         border: 2px solid #0F172A;
                         border-radius: 16px;
-                        background: #FFFFFF;
+                        background-color: #FFFFFF;
                         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                         box-shadow: 0px 8px 20px rgba(15, 23, 42, 0.15);
                         position: relative;
@@ -348,88 +366,108 @@ else:
                         overflow: hidden;
                         color: #0F172A;
                     ">
-                        <!-- BANDEAU SUPÉRIEUR -->
-                        <div style="
-                            background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
-                            padding: 16px 10px 12px 10px;
-                            text-align: center;
-                            color: #FFFFFF;
-                            border-bottom: 4px solid #F59E0B;
-                        ">
-                            <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; opacity: 0.9; text-transform: uppercase;">TRAINING CENTER</div>
-                            <div style="font-size: 17px; font-weight: 900; color: #F59E0B; margin-top: 2px; letter-spacing: 0.5px;">SMART PEOPLE CENTER</div>
-                            <div style="font-size: 10px; font-weight: 800; color: #0F172A; background: #FBBF24; display: inline-block; padding: 2px 10px; border-radius: 20px; margin-top: 6px; text-transform: uppercase;">
-                                LEARNER CARD
-                            </div>
-                        </div>
-
-                        <!-- PHOTO ET ANNÉE -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 10px 20px;">
-                            <div style="
-                                width: 105px;
-                                height: 125px;
-                                border: 3px solid #E2E8F0;
-                                border-radius: 10px;
-                                overflow: hidden;
-                                background: #F8FAFC;
-                                box-shadow: inset 0px 0px 5px rgba(0,0,0,0.05);
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            ">
-                                <img src="{b64_photo}" style="width: 100%; height: 100%; object-fit: cover;">
-                            </div>
-
-                            <div style="text-align: right; background: #F1F5F9; padding: 10px 14px; border-radius: 10px; border-left: 3px solid #1E3A8A;">
-                                <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Year of Study</div>
-                                <div style="font-size: 15px; font-weight: 900; color: #0F172A; margin-top: 2px;">{annee_scolaire}</div>
-                            </div>
-                        </div>
-
-                        <!-- INFORMATIONS -->
-                        <div style="padding: 0 20px; font-size: 12px;">
-                            <div style="margin-bottom: 12px;">
-                                <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Full Name</div>
-                                <div style="font-size: 14px; font-weight: 900; color: #1E3A8A; text-transform: uppercase; line-height: 1.2;">{nom_app}</div>
-                            </div>
-
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; background: #FAF5FF; padding: 8px 12px; border-radius: 8px; border: 1px solid #F3E8FF;">
-                                <div>
-                                    <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Registration No</div>
-                                    <div style="font-size: 13px; font-weight: 900; color: #D97706;">{mat}</div>
-                                </div>
-                                <div style="text-align: right;">
-                                    <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Sex</div>
-                                    <div style="font-size: 13px; font-weight: 800; color: #0F172A;">{sexe_app}</div>
-                                </div>
-                            </div>
-
-                            <div style="margin-bottom: 10px;">
-                                <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Level / Program</div>
-                                <div style="font-size: 12px; font-weight: 800; color: #0F172A;">{niv_app}</div>
-                            </div>
-                        </div>
-
-                        <!-- QR CODE ET BAS DE PAGE -->
+                        <!-- LOGO BLASON EN ARRIÈRE-PLAN (FILIGRANE) -->
                         <div style="
                             position: absolute;
-                            bottom: 0;
-                            left: 0;
-                            right: 0;
-                            background: #F8FAFC;
-                            border-top: 1px dashed #CBD5E1;
-                            padding: 10px 20px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: space-between;
-                        ">
-                            <div style="text-align: left; max-width: 180px;">
-                                <div style="font-size: 8px; color: #64748B; font-weight: 600; line-height: 1.3;">
-                                    Official identification card for Smart People Center attendance and verification.
+                            top: 55%;
+                            left: 50%;
+                            transform: translate(-50%, -40%);
+                            width: 270px;
+                            height: 330px;
+                            {bg_style}
+                            background-size: contain;
+                            background-repeat: no-repeat;
+                            background-position: center;
+                            opacity: 0.18;
+                            z-index: 1;
+                            pointer-events: none;
+                        "></div>
+
+                        <!-- CONTENU DE LA CARTE -->
+                        <div style="position: relative; z-index: 2; height: 100%;">
+                            <!-- BANDEAU SUPÉRIEUR -->
+                            <div style="
+                                background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
+                                padding: 16px 10px 12px 10px;
+                                text-align: center;
+                                color: #FFFFFF;
+                                border-bottom: 4px solid #F59E0B;
+                            ">
+                                <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; opacity: 0.9; text-transform: uppercase;">TRAINING CENTER</div>
+                                <div style="font-size: 17px; font-weight: 900; color: #F59E0B; margin-top: 2px; letter-spacing: 0.5px;">SMART PEOPLE CENTER</div>
+                                <div style="font-size: 10px; font-weight: 800; color: #0F172A; background: #FBBF24; display: inline-block; padding: 2px 10px; border-radius: 20px; margin-top: 6px; text-transform: uppercase;">
+                                    LEARNER CARD
                                 </div>
                             </div>
-                            <div style="text-align: center;">
-                                <img src="{b64_qr}" style="width: 70px; height: 70px; border-radius: 4px; border: 1px solid #CBD5E1; background: white; padding: 2px;">
+
+                            <!-- PHOTO ET ANNÉE -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 10px 20px;">
+                                <div style="
+                                    width: 105px;
+                                    height: 125px;
+                                    border: 3px solid #E2E8F0;
+                                    border-radius: 10px;
+                                    overflow: hidden;
+                                    background: #F8FAFC;
+                                    box-shadow: inset 0px 0px 5px rgba(0,0,0,0.05);
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                ">
+                                    <img src="{b64_photo}" style="width: 100%; height: 100%; object-fit: cover;">
+                                </div>
+
+                                <div style="text-align: right; background: rgba(241, 245, 249, 0.85); padding: 10px 14px; border-radius: 10px; border-left: 3px solid #1E3A8A;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Year of Study</div>
+                                    <div style="font-size: 15px; font-weight: 900; color: #0F172A; margin-top: 2px;">{annee_scolaire}</div>
+                                </div>
+                            </div>
+
+                            <!-- INFORMATIONS -->
+                            <div style="padding: 0 20px; font-size: 12px;">
+                                <div style="margin-bottom: 12px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Full Name</div>
+                                    <div style="font-size: 14px; font-weight: 900; color: #1E3A8A; text-transform: uppercase; line-height: 1.2;">{nom_app}</div>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; background: rgba(250, 245, 255, 0.85); padding: 8px 12px; border-radius: 8px; border: 1px solid #F3E8FF;">
+                                    <div>
+                                        <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Registration No</div>
+                                        <div style="font-size: 13px; font-weight: 900; color: #D97706;">{mat}</div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase;">Sex</div>
+                                        <div style="font-size: 13px; font-weight: 800; color: #0F172A;">{sexe_app}</div>
+                                    </div>
+                                </div>
+
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase;">Level / Program</div>
+                                    <div style="font-size: 12px; font-weight: 800; color: #0F172A;">{niv_app}</div>
+                                </div>
+                            </div>
+
+                            <!-- QR CODE ET BAS DE PAGE -->
+                            <div style="
+                                position: absolute;
+                                bottom: 0;
+                                left: 0;
+                                right: 0;
+                                background: rgba(248, 250, 252, 0.95);
+                                border-top: 1px dashed #CBD5E1;
+                                padding: 10px 20px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: space-between;
+                            ">
+                                <div style="text-align: left; max-width: 180px;">
+                                    <div style="font-size: 8px; color: #64748B; font-weight: 600; line-height: 1.3;">
+                                        Official identification card for Smart People Center attendance and verification.
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <img src="{b64_qr}" style="width: 70px; height: 70px; border-radius: 4px; border: 1px solid #CBD5E1; background: white; padding: 2px;">
+                                </div>
                             </div>
                         </div>
                     </div>
