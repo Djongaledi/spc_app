@@ -1,11 +1,11 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import sys
 import os
 
-sys.path.append(os.path.abspath(".."))
-from database import DB_NAME
+# Gestion des imports du dossier parent
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from database import get_connection
 from utils_qr import generer_qr_code
 
 st.set_page_config(page_title="Espace Apprenant - SPC", page_icon="🎓", layout="wide")
@@ -73,7 +73,7 @@ with st.sidebar:
 # Titre encadré
 st.markdown("""
     <div class="student-header">
-        <h1 style="margin:0; font-size:2.2rem; font-weight:800;">👨🎓 ESPACE APPRENANT</h1>
+        <h1 style="margin:0; font-size:2.2rem; font-weight:800;">👨‍🎓 ESPACE APPRENANT</h1>
         <p style="margin:5px 0 0 0; color:#FBBF24; font-weight:500;">"if you're reach, be the bridge"</p>
     </div>
 """, unsafe_allow_html=True)
@@ -82,67 +82,67 @@ st.markdown("### 🔑 Identification")
 matricule_input = st.text_input("", placeholder="Entrez votre Matricule (ex: SPC-4825)").strip()
 
 if matricule_input:
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("SELECT nom, sexe, niveau, date_inscription FROM apprenants WHERE matricule = ?", (matricule_input,))
-    apprenant = c.fetchone()
-    conn.close()
-
-    if apprenant:
-        nom, sexe, niveau, date_inscription = apprenant
-        
-        st.success(f"🎉 Bienvenue dans votre espace, **{nom}** !")
-        
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.markdown("<div class='profile-card' style='text-align:center;'>", unsafe_allow_html=True)
-            st.markdown("<h3 style='color:#1E3A8A;'>🪪 Badge Virtuel</h3>", unsafe_allow_html=True)
-            qr_bytes = generer_qr_code(matricule_input)
-            
-            st.image(qr_bytes, caption=f"Matricule : {matricule_input}", width=190)
-            
-            st.download_button(
-                label="📥 Télécharger QR Code",
-                data=qr_bytes,
-                file_name=f"QR_Code_{matricule_input}.png",
-                mime="image/png"
-            )
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-        with col2:
-            st.markdown("<div class='profile-card'>", unsafe_allow_html=True)
-            st.markdown("<h3 style='color:#1E3A8A;'>📌 Informations Personnelles</h3>", unsafe_allow_html=True)
-            st.markdown(f"**👤 Nom complet :** `{nom}`")
-            st.markdown(f"**🚻 Sexe :** `{sexe}`")
-            st.markdown(f"**📚 Niveau :** `{niveau}`")
-            st.markdown(f"**📅 Date d'inscription :** `{date_inscription}`")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        st.write("---")
-        st.markdown("<h3 style='color:#1E3A8A;'>📅 Historique de vos Présences</h3>", unsafe_allow_html=True)
-        
-        conn = sqlite3.connect(DB_NAME)
-        query_presences = """
-            SELECT date_presence AS Date, heure_presence AS Heure
-            FROM presences
-            WHERE matricule = ?
-            ORDER BY id DESC
-        """
-        df_presences = pd.read_sql_query(query_presences, conn, params=(matricule_input,))
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        # Syntax PostgreSQL avec %s
+        c.execute("SELECT nom, sexe, niveau, date_inscription FROM apprenants WHERE matricule = %s;", (matricule_input,))
+        apprenant = c.fetchone()
+        c.close()
         conn.close()
 
-        if not df_presences.empty:
-            st.dataframe(df_presences, use_container_width=True)
-            st.info(f"📊 Total cumulé : **{len(df_presences)}** séance(s) effectuée(s).")
+        if apprenant:
+            nom, sexe, niveau, date_inscription = apprenant
+            
+            st.success(f"🎉 Bienvenue dans votre espace, **{nom}** !")
+            
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                st.markdown("<div class='profile-card' style='text-align:center;'>", unsafe_allow_html=True)
+                st.markdown("<h3 style='color:#1E3A8A;'>🪪 Badge Virtuel</h3>", unsafe_allow_html=True)
+                qr_bytes = generer_qr_code(matricule_input)
+                
+                st.image(qr_bytes, caption=f"Matricule : {matricule_input}", width=190)
+                
+                st.download_button(
+                    label="📥 Télécharger QR Code",
+                    data=qr_bytes,
+                    file_name=f"QR_Code_{matricule_input}.png",
+                    mime="image/png"
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+            with col2:
+                st.markdown("<div class='profile-card'>", unsafe_allow_html=True)
+                st.markdown("<h3 style='color:#1E3A8A;'>📌 Informations Personnelles</h3>", unsafe_allow_html=True)
+                st.markdown(f"**👤 Nom complet :** `{nom}`")
+                st.markdown(f"**🚻 Sexe :** `{sexe}`")
+                st.markdown(f"**📚 Niveau :** `{niveau}`")
+                st.markdown(f"**📅 Date d'inscription :** `{date_inscription}`")
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            st.write("---")
+            st.markdown("<h3 style='color:#1E3A8A;'>📅 Historique de vos Présences</h3>", unsafe_allow_html=True)
+            
+            conn = get_connection()
+            query_presences = """
+                SELECT date_presence AS "Date", heure_presence AS "Heure"
+                FROM presences
+                WHERE matricule = %s
+                ORDER BY id DESC;
+            """
+            df_presences = pd.read_sql_query(query_presences, conn, params=(matricule_input,))
+            conn.close()
+
+            if not df_presences.empty:
+                st.dataframe(df_presences, use_container_width=True)
+                st.info(f"📊 Total cumulé : **{len(df_presences)}** séance(s) effectuée(s).")
+            else:
+                st.warning("Aucune présence enregistrée pour ce matricule pour le moment.")
         else:
-            st.warning("Aucune présence enregistrée pour ce matricule pour le moment.")
-    else:
-        st.error("❌ Matricule introuvable. Veuillez vérifier votre saisie.")
+            st.error("❌ Matricule introuvable. Veuillez vérifier votre saisie.")
+    except Exception as e:
+        st.error(f"Erreur de connexion à la base de données : {e}")
 else:
     st.info("💡 Tapez votre matricule ci-dessus pour afficher vos informations.")
-
-
-
-
-
