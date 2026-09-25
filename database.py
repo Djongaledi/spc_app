@@ -1,72 +1,54 @@
-import sqlite3
-import pandas as pd
-from datetime import datetime
+import psycopg2
+import streamlit as st
 
-DB_NAME = "spc_database.db"
+def get_connection():
+    """Établit la connexion à la base de données PostgreSQL (Supabase)"""
+    return psycopg2.connect(
+        host=st.secrets["postgres"]["host"],
+        database=st.secrets["postgres"]["database"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"],
+        port=st.secrets["postgres"]["port"]
+    )
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
+    """Initialise les tables PostgreSQL si elles n'existent pas"""
+    conn = get_connection()
+    cursor = conn.cursor()
     
-    # Table des apprenants
-    c.execute('''
+    # Table Apprenants
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS apprenants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            matricule TEXT UNIQUE,
-            nom TEXT,
-            sexe TEXT,
-            niveau TEXT,
-            qr_code_path TEXT,
-            date_inscription TEXT
+            matricule VARCHAR(50) PRIMARY KEY,
+            nom VARCHAR(100) NOT NULL,
+            postnom VARCHAR(100),
+            prenom VARCHAR(100),
+            filiere VARCHAR(100),
+            niveau VARCHAR(50),
+            photo TEXT
         )
     ''')
-    
-    # Table des présences
-    c.execute('''
+
+    # Table Presences
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS presences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            matricule TEXT,
-            date_presence TEXT,
-            heure_presence TEXT,
-            FOREIGN KEY (matricule) REFERENCES apprenants (matricule)
+            id SERIAL PRIMARY KEY,
+            matricule VARCHAR(50) REFERENCES apprenants(matricule) ON DELETE CASCADE,
+            date VARCHAR(20) NOT NULL,
+            heure VARCHAR(20) NOT NULL,
+            statut VARCHAR(20) NOT NULL
         )
     ''')
-    
-    # Suppression de l'ancienne table admin si elle existe sans 'id'
-    c.execute("DROP TABLE IF EXISTS admin")
-    
-    # Reconstitution propre de la table Admin
-    c.execute('''
-        CREATE TABLE admin (
-            username TEXT PRIMARY KEY,
-            password TEXT
+
+    # Table Admin
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admin (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL
         )
     ''')
-    
-    # Insertion des identifiants personnalisés
-    c.execute("INSERT INTO admin (username, password) VALUES ('DJONGALEDI', 'DjongaSime2026')")
-    
+
     conn.commit()
+    cursor.close()
     conn.close()
-
-# Liste des niveaux officiels du SPC
-NIVEAUX_SPC = [
-    "First level down",
-    "First level up",
-    "Second level down",
-    "Second level up",
-    "Third level down",
-    "Third level up",
-    "Teacher"
-]
-
-if __name__ == "__main__":
-    init_db()
-    print("Base de données mise à jour avec succès !")
-       
-
-
-
-
-
-
