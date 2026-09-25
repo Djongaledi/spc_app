@@ -331,7 +331,7 @@ else:
                     else:
                         b64_photo = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%2394A3B8'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>"
 
-                    # Logo SPC uploadé (utilisé à la fois pour l'icône à gauche et le filigrane)
+                    # Logo SPC uploadé
                     if uploaded_logo:
                         logo_bytes = uploaded_logo.getvalue()
                         b64_logo = f"data:image/png;base64,{base64.b64encode(logo_bytes).decode()}"
@@ -360,26 +360,26 @@ else:
                         overflow: hidden;
                         color: #0F172A;
                     ">
-                        <!-- LOGO BLASON EN ARRIÈRE-PLAN (FILIGRANE VISIBLE) -->
+                        <!-- LOGO BLASON EN ARRIÈRE-PLAN (FILIGRANE CENTRÉ ET AJUSTÉ) -->
                         <div style="
                             position: absolute;
-                            top: 55%;
+                            top: 50%;
                             left: 50%;
-                            transform: translate(-50%, -40%);
-                            width: 270px;
-                            height: 330px;
+                            transform: translate(-50%, -50%);
+                            width: 300px;
+                            height: 380px;
                             {bg_style}
                             background-size: contain;
                             background-repeat: no-repeat;
                             background-position: center;
-                            opacity: 0.18;
+                            opacity: 0.15;
                             z-index: 1;
                             pointer-events: none;
                         "></div>
 
                         <!-- CONTENU DE LA CARTE -->
                         <div style="position: relative; z-index: 2; height: 100%;">
-                            <!-- BANDEAU SUPÉRIEUR AVEC LOGO ICÔNE À GAUCHE -->
+                            <!-- BANDEAU SUPÉRIEUR AVEC LOGO ICÔNE AGRANDI À GAUCHE -->
                             <div style="
                                 background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
                                 padding: 12px 14px;
@@ -389,17 +389,17 @@ else:
                                 justify-content: flex-start;
                                 gap: 12px;
                             ">
-                                <!-- ICÔNE LOGO SPC -->
+                                <!-- ICÔNE LOGO SPC AGRANDIE -->
                                 <div style="
-                                    width: 44px;
-                                    height: 44px;
-                                    border-radius: 8px;
+                                    width: 54px;
+                                    height: 54px;
+                                    border-radius: 10px;
                                     background: #FFFFFF;
                                     padding: 2px;
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
-                                    box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+                                    box-shadow: 0px 3px 8px rgba(0,0,0,0.25);
                                     flex-shrink: 0;
                                 ">
                                     <img src="{b64_logo}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
