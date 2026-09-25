@@ -462,7 +462,7 @@ else:
                                 </div>
                             </div>
 
-                            <!-- QR CODE ET BAS DE PAGE -->
+                            <!-- QR CODE ET BAS DE PAGE (QR CODE AGRANDI POUR UN MEILLEUR SCAN) -->
                             <div style="
                                 position: absolute;
                                 bottom: 0;
@@ -470,18 +470,18 @@ else:
                                 right: 0;
                                 background: rgba(248, 250, 252, 0.95);
                                 border-top: 1px dashed #CBD5E1;
-                                padding: 10px 20px;
+                                padding: 8px 16px;
                                 display: flex;
                                 align-items: center;
                                 justify-content: space-between;
                             ">
-                                <div style="text-align: left; max-width: 180px;">
+                                <div style="text-align: left; max-width: 190px;">
                                     <div style="font-size: 8px; color: #64748B; font-weight: 600; line-height: 1.3;">
                                         Official identification card for Smart People Center attendance and verification.
                                     </div>
                                 </div>
                                 <div style="text-align: center;">
-                                    <img src="{b64_qr}" style="width: 70px; height: 70px; border-radius: 4px; border: 1px solid #CBD5E1; background: white; padding: 2px;">
+                                    <img src="{b64_qr}" style="width: 110px; height: 110px; border-radius: 4px; border: 1px solid #CBD5E1; background: white; padding: 3px;">
                                 </div>
                             </div>
                         </div>
