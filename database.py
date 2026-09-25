@@ -1,8 +1,19 @@
 import psycopg2
 import streamlit as st
 
+# Liste officielle des niveaux du SPC
+NIVEAUX_SPC = [
+    "First level down",
+    "First level up",
+    "Second level down",
+    "Second level up",
+    "Third level down",
+    "Third level up",
+    "Teacher"
+]
+
 def get_connection():
-    """Établit la connexion à la base de données PostgreSQL (Supabase)"""
+    """Établit la connexion à la base de données PostgreSQL (Supabase) via st.secrets."""
     return psycopg2.connect(
         host=st.secrets["postgres"]["host"],
         database=st.secrets["postgres"]["database"],
@@ -12,43 +23,53 @@ def get_connection():
     )
 
 def init_db():
-    """Initialise les tables PostgreSQL si elles n'existent pas"""
+    """Initialise la structure des tables PostgreSQL sur Supabase."""
     conn = get_connection()
-    cursor = conn.cursor()
+    c = conn.cursor()
     
-    # Table Apprenants
-    cursor.execute('''
+    # 1. Table des apprenants
+    c.execute("""
         CREATE TABLE IF NOT EXISTS apprenants (
-            matricule VARCHAR(50) PRIMARY KEY,
-            nom VARCHAR(100) NOT NULL,
-            postnom VARCHAR(100),
-            prenom VARCHAR(100),
-            filiere VARCHAR(100),
-            niveau VARCHAR(50),
-            photo TEXT
-        )
-    ''')
-
-    # Table Presences
-    cursor.execute('''
+            id SERIAL PRIMARY KEY,
+            matricule VARCHAR(50) UNIQUE NOT NULL,
+            nom VARCHAR(255) NOT NULL,
+            sexe VARCHAR(20),
+            niveau VARCHAR(100),
+            qr_code_path TEXT,
+            date_inscription VARCHAR(100)
+        );
+    """)
+    
+    # 2. Table des présences
+    c.execute("""
         CREATE TABLE IF NOT EXISTS presences (
             id SERIAL PRIMARY KEY,
             matricule VARCHAR(50) REFERENCES apprenants(matricule) ON DELETE CASCADE,
-            date VARCHAR(20) NOT NULL,
-            heure VARCHAR(20) NOT NULL,
-            statut VARCHAR(20) NOT NULL
-        )
-    ''')
-
-    # Table Admin
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS admin (
+            date_presence VARCHAR(20) NOT NULL,
+            heure_presence VARCHAR(20) NOT NULL
+        );
+    """)
+    
+    # 3. Table admin (Reconstitution propre avec identifiants personnalisés)
+    c.execute("DROP TABLE IF EXISTS admin;")
+    c.execute("""
+        CREATE TABLE admin (
             id SERIAL PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
+            username VARCHAR(100) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL
-        )
-    ''')
-
+        );
+    """)
+    
+    # Insertion de vos identifiants administrateur personnalisés
+    c.execute(
+        "INSERT INTO admin (username, password) VALUES (%s, %s);",
+        ('DJONGALEDI', 'DjongaSime2026')
+    )
+    
     conn.commit()
-    cursor.close()
+    c.close()
     conn.close()
+
+if __name__ == "__main__":
+    init_db()
+    print("Base de données PostgreSQL/Supabase mise à jour avec succès !")
