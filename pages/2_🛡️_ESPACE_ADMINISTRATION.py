@@ -125,7 +125,7 @@ def login():
     st.markdown("""
         <div class="admin-header">
             <h1 style="margin:0; font-size:2.2rem; font-weight:800;">🛡️ ESPACE ADMINISTRATION</h1>
-            <p style="margin:5px 0 0 0; color:#FBBF24;">"if you're reach, be the bridge"</p>
+            <p style="margin:5px 0 0 0; color:#FBBF24;">"if you're rich, be the bridge"</p>
         </div>
     """, unsafe_allow_html=True)
     
